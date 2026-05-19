@@ -1,0 +1,20 @@
+# PlatformIO build artifacts and library cache
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Build outputs
+*.elf
+*.bin
+*.map
+*.hex
+
+# CodeGraphContext local index
+.codegraphcontext/
