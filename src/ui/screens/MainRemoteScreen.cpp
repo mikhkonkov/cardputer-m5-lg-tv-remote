@@ -29,8 +29,9 @@ void MainRemoteScreen::build() {
     addButton(mk( 2, "MUTE", 80, 18, 40, 22, CommandId::Mute,  BtnStyle::Mute,  'm'));
 
     // ----- D-pad cluster (centered) -----
+    // cy chosen so the "v" arrow (cy + 32) clears the bottom row at y=102.
     const int16_t cx = 64; // cluster center x
-    const int16_t cy = 80; // cluster center y
+    const int16_t cy = 66; // cluster center y
     const int16_t s  = 22; // arrow size
     addButton(mk( 3, "^",
                   static_cast<int16_t>(cx - s/2),

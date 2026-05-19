@@ -1,7 +1,9 @@
 #include "ui/Screen.h"
 
 #include <Arduino.h>
+#include <M5Cardputer.h>
 #include <M5GFX.h>
+#include <stdio.h>
 
 #include "config.h"
 #include "ir/RemoteController.h"
@@ -162,16 +164,48 @@ void Screen::drawBackground() {
 void Screen::drawHeader() {
     if (!d_) return;
     d_->fillRect(0, 0, config::kScreenWidth, Theme::kHeaderH, Theme::kHeader);
-    d_->setTextColor(Theme::kTextPrimary);
-    d_->setTextDatum(middle_left);
     d_->setTextSize(1);
+    d_->setTextDatum(middle_left);
+    d_->setTextColor(Theme::kTextPrimary);
     d_->drawString(title(), 4, Theme::kHeaderH / 2);
+
+    int16_t rightX = config::kScreenWidth - 4;
+
+    // Battery: low-rate poll + hysteresis so the percent does not bounce
+    // every frame (ADC + charge-IC noise jitters by 1-2% when charging).
+    static int      s_battery   = -2; // -2 = never sampled, -1 = unsupported
+    static uint32_t s_nextPoll  = 0;
+    constexpr uint32_t kBatteryPollMs    = 5000;
+    constexpr int      kBatteryHysteresis = 2;
+    const uint32_t now = millis();
+    if (s_battery == -2 || now >= s_nextPoll) {
+        const int raw = M5Cardputer.Power.getBatteryLevel();
+        if (raw < 0) {
+            s_battery = -1;
+        } else if (s_battery < 0) {
+            s_battery = raw;
+        } else {
+            const int delta = raw > s_battery ? raw - s_battery : s_battery - raw;
+            if (delta >= kBatteryHysteresis) s_battery = raw;
+        }
+        s_nextPoll = now + kBatteryPollMs;
+    }
+
+    if (s_battery >= 0) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d%%", s_battery);
+        d_->setTextDatum(middle_right);
+        d_->setTextColor(s_battery < 20 ? Theme::kToastFail : Theme::kTextDim);
+        d_->drawString(buf, rightX, Theme::kHeaderH / 2);
+        rightX -= 30; // reserve for "100%" + small gap
+    }
+
     if (pm_) {
         const profiles::Profile* p = pm_->current();
         if (p) {
             d_->setTextDatum(middle_right);
             d_->setTextColor(Theme::kTextDim);
-            d_->drawString(p->brand, config::kScreenWidth - 4, Theme::kHeaderH / 2);
+            d_->drawString(p->brand, rightX, Theme::kHeaderH / 2);
         }
     }
     d_->setTextDatum(top_left);
@@ -194,10 +228,10 @@ void Screen::render(uint32_t nowMs) {
 
     if (needsFullRedraw_) {
         d_->fillScreen(Theme::kBg);
-        drawHeader();
         drawBackground();
         drawFooter();
     }
+    drawHeader(); // every frame so battery + brand stay live
 
     for (uint8_t i = 0; i < buttonCount_; ++i) {
         const Button& b = buttons_[i];
